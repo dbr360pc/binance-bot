@@ -1,4 +1,5 @@
 import json
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime
 
@@ -29,7 +30,14 @@ async def list_orders(
         raise HTTPException(status_code=503, detail="Binance credentials not configured")
 
     app_settings = await get_app_settings()
-    raw = await binance.get_open_orders(page=page, rows=rows)
+    try:
+        raw = await binance.get_open_orders(page=page, rows=rows)
+    except httpx.HTTPStatusError as exc:
+        # Use 502 so the Axios 401-interceptor doesn't silently redirect to /login
+        raise HTTPException(
+            status_code=502,
+            detail=f"Binance error ({exc.response.status_code}): {exc}",
+        )
     orders_data = raw.get("data", {}).get("orderList", [])
 
     result = []
@@ -80,6 +88,28 @@ async def list_orders(
         })
 
     return {"orders": result, "total": len(result)}
+
+
+@router.get("/test-connection")
+async def test_binance_connection(
+    current_user: dict = Depends(get_current_user),
+):
+    """Diagnostic endpoint – calls Binance and returns the raw response or full error."""
+    binance = await get_binance_client_from_db()
+    if not binance:
+        return {"ok": False, "error": "Binance credentials not configured in Secrets"}
+    try:
+        raw = await binance.get_open_orders(page=1, rows=1)
+        return {"ok": True, "response": raw}
+    except httpx.HTTPStatusError as exc:
+        return {
+            "ok": False,
+            "http_status": exc.response.status_code,
+            "binance_body": exc.response.text,
+            "url": str(exc.response.url),
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 @router.get("/history")
