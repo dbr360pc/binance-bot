@@ -17,6 +17,7 @@ services:
       - internal
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik_network
       - traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
       - traefik.http.routers.backend.entrypoints=websecure
       - traefik.http.routers.backend.tls.certresolver=letsencrypt
@@ -32,6 +33,7 @@ services:
       - traefik_network
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik_network
       - traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls.certresolver=letsencrypt
@@ -41,6 +43,8 @@ services:
     image: mongo:7
     container_name: mongodb
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"   # localhost only – use SSH tunnel to access remotely
     volumes:
       - mongodb_data:/data/db
     networks:
