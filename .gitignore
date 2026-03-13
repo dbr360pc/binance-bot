@@ -1,7 +1,5 @@
 # Environment secrets – never commit these
 .env
-backend/.env.prod
-letsencrypt/
 
 # Python
 __pycache__/
