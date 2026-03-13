@@ -53,9 +53,9 @@ class BinanceClient:
             query_params = {}
             if signed:
                 ts = int(time.time() * 1000)
-                # Signature covers timestamp + all payload fields (query-string format)
-                sign_parts = {"timestamp": ts, **data}
-                query_string = "&".join([f"{k}={v}" for k, v in sign_parts.items()])
+                # For JSON-body POST requests Binance signs only the query string
+                # (i.e. just the timestamp), NOT the JSON body fields.
+                query_string = f"timestamp={ts}"
                 sig = hmac.new(
                     self.secret_key.encode("utf-8"),
                     query_string.encode("utf-8"),
