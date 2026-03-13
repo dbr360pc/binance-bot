@@ -44,7 +44,7 @@ services:
     container_name: mongodb
     restart: unless-stopped
     ports:
-      - "127.0.0.1:27017:27017"   # localhost only – use SSH tunnel to access remotely
+      - "0.0.0.0:27017:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
