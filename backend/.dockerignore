@@ -11,4 +11,3 @@ venv/
 .pytest_cache/
 .mypy_cache/
 start.bat
-create_admin.py
