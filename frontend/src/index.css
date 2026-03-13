@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-binance-dark text-binance-text-primary;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-binance-yellow text-binance-dark font-semibold px-4 py-2 rounded hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-binance-gray-light text-binance-text-primary font-semibold px-4 py-2 rounded hover:bg-opacity-80 transition-colors;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white font-semibold px-4 py-2 rounded hover:bg-red-700 transition-colors disabled:opacity-50;
+  }
+  .card {
+    @apply bg-binance-gray rounded-lg border border-binance-gray-light p-6;
+  }
+  .input-field {
+    @apply bg-binance-gray-light border border-binance-gray-light text-binance-text-primary rounded px-3 py-2 w-full focus:outline-none focus:border-binance-yellow;
+  }
+  .label {
+    @apply block text-sm text-binance-text-secondary mb-1;
+  }
+  .badge-manual    { @apply bg-gray-700 text-gray-300 text-xs font-medium px-2 py-1 rounded-full; }
+  .badge-checking  { @apply bg-blue-900 text-blue-300 text-xs font-medium px-2 py-1 rounded-full; }
+  .badge-failed    { @apply bg-red-900 text-red-300 text-xs font-medium px-2 py-1 rounded-full; }
+  .badge-safe      { @apply bg-green-900 text-green-300 text-xs font-medium px-2 py-1 rounded-full animate-pulse; }
+  .badge-released  { @apply bg-yellow-900 text-yellow-300 text-xs font-medium px-2 py-1 rounded-full; }
+}

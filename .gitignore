@@ -1,0 +1,15 @@
+# Environment secrets – never commit these
+.env
+backend/.env.prod
+letsencrypt/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node
+frontend/node_modules/
+frontend/dist/
