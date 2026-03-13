@@ -50,9 +50,24 @@ class BinanceClient:
     async def _post(self, url: str, payload: dict = None, signed: bool = True) -> Any:
         async with httpx.AsyncClient(timeout=30) as client:
             data = payload or {}
+            query_params = {}
             if signed:
-                data = self._build_signed_params(data)
-            response = await client.post(url, params=data, headers=self._get_headers())
+                ts = int(time.time() * 1000)
+                # Signature covers timestamp + all payload fields (query-string format)
+                sign_parts = {"timestamp": ts, **data}
+                query_string = "&".join([f"{k}={v}" for k, v in sign_parts.items()])
+                sig = hmac.new(
+                    self.secret_key.encode("utf-8"),
+                    query_string.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+                query_params = {"timestamp": ts, "signature": sig}
+            response = await client.post(
+                url,
+                params=query_params,
+                json=data,
+                headers=self._get_headers(),
+            )
             response.raise_for_status()
             return response.json()
 
