@@ -5,8 +5,9 @@ import { Eye, EyeOff, Save, CheckCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const SECRET_LABELS = {
-  BINANCE_API_KEY: 'Binance API Key',
-  BINANCE_SECRET_KEY: 'Binance Secret Key',
+  BINANCE_API_KEY: 'Binance API Key (unused)',
+  BINANCE_SECRET_KEY: 'Binance Secret Key (unused)',
+  BINANCE_COOKIES: 'Binance Session Cookies',
   PLAID_CLIENT_ID: 'Plaid Client ID',
   PLAID_SECRET_SANDBOX: 'Plaid Secret (Sandbox)',
   PLAID_SECRET_PRODUCTION: 'Plaid Secret (Production)',

@@ -1,78 +1,62 @@
 """
 Binance C2C/SAPI Merchant Client
-Handles signed requests per Binance API documentation.
+
+NOTE: c2c.binance.com/bapi/... endpoints are internal web APIs that use
+browser-session cookie authentication, NOT API-key + HMAC signing.
+Store the full Cookie header string from a logged-in Binance browser
+session as the BINANCE_COOKIES secret.
+
+How to get cookies:
+  1. Log into https://www.binance.com in Chrome/Firefox
+  2. Open DevTools → Network → reload any page
+  3. Click any request to binance.com → Headers → Request Headers
+  4. Copy the entire Cookie: ... value
+  5. Paste it into the BINANCE_COOKIES secret in the app
 """
-import hashlib
-import hmac
 import logging
-import time
+import re
 from typing import Optional, Any
 import httpx
 
 logger = logging.getLogger(__name__)
 
-
-BINANCE_BASE_URL = "https://api.binance.com"
 C2C_BASE_URL = "https://c2c.binance.com"
 
 
 class BinanceClient:
-    def __init__(self, api_key: str, secret_key: str, account_id: str = "default"):
-        self.api_key = api_key
-        self.secret_key = secret_key
+    def __init__(self, cookies: str, account_id: str = "default"):
+        """
+        :param cookies: Raw Cookie header string copied from a logged-in
+                        Binance browser session, e.g.
+                        "csrftoken=abc; BNC-Location=xxx; p20t=yyy; ..."
+        """
+        self.cookies = cookies
         self.account_id = account_id
-
-    def _sign(self, params: dict) -> str:
-        query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-        signature = hmac.new(
-            self.secret_key.encode("utf-8"),
-            query_string.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-        return signature
+        # Extract csrftoken for the Csrftoken header Binance requires
+        m = re.search(r'(?:^|;\s*)csrftoken=([^;]+)', cookies)
+        self.csrf_token = m.group(1) if m else ""
 
     def _get_headers(self) -> dict:
         return {
-            "X-MBX-APIKEY": self.api_key,
+            "Cookie": self.cookies,
+            "Csrftoken": self.csrf_token,
             "Content-Type": "application/json",
+            "clienttype": "web",
+            "lang": "en-US",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
         }
 
-    def _build_signed_params(self, extra: dict) -> dict:
-        params = {"timestamp": int(time.time() * 1000), **extra}
-        params["signature"] = self._sign(params)
-        return params
-
-    async def _get(self, url: str, params: dict = None, signed: bool = True) -> Any:
+    async def _post(self, url: str, payload: dict = None) -> Any:
         async with httpx.AsyncClient(timeout=30) as client:
-            if signed:
-                params = self._build_signed_params(params or {})
-            response = await client.get(url, params=params, headers=self._get_headers())
-            self._raise_for_status(response)
-            return response.json()
-
-    async def _post(self, url: str, payload: dict = None, signed: bool = True) -> Any:
-        """
-        Binance C2C private endpoints expect all parameters (including timestamp
-        and signature) in the query string.  The body is left empty.
-        The signature is computed over the full query-string that includes all
-        payload fields, e.g.:
-          timestamp=1234&page=1&rows=20&orderStatusList=1,2,3
-        """
-        async with httpx.AsyncClient(timeout=30) as client:
-            params = dict(payload or {})
-            if signed:
-                params["timestamp"] = int(time.time() * 1000)
-                qs = "&".join(f"{k}={v}" for k, v in params.items())
-                params["signature"] = hmac.new(
-                    self.secret_key.encode(),
-                    qs.encode(),
-                    hashlib.sha256,
-                ).hexdigest()
-            headers = {
-                "X-MBX-APIKEY": self.api_key,
-                "Content-Type": "application/json",
-            }
-            response = await client.post(url, params=params, headers=headers)
+            response = await client.post(
+                url,
+                json=payload or {},
+                headers=self._get_headers(),
+            )
             self._raise_for_status(response)
             return response.json()
 
@@ -139,8 +123,7 @@ class BinanceClient:
 async def get_binance_client_from_db() -> Optional[BinanceClient]:
     """Build a BinanceClient from secrets stored in MongoDB."""
     from app.services.secrets_service import get_secret
-    api_key = await get_secret("BINANCE_API_KEY")
-    secret_key = await get_secret("BINANCE_SECRET_KEY")
-    if not api_key or not secret_key:
+    cookies = await get_secret("BINANCE_COOKIES")
+    if not cookies:
         return None
-    return BinanceClient(api_key=api_key, secret_key=secret_key)
+    return BinanceClient(cookies=cookies)
