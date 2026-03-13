@@ -4,9 +4,12 @@ Handles signed requests per Binance API documentation.
 """
 import hashlib
 import hmac
+import logging
 import time
 from typing import Optional, Any
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 BINANCE_BASE_URL = "https://api.binance.com"
@@ -44,32 +47,49 @@ class BinanceClient:
             if signed:
                 params = self._build_signed_params(params or {})
             response = await client.get(url, params=params, headers=self._get_headers())
-            response.raise_for_status()
+            self._raise_for_status(response)
             return response.json()
 
     async def _post(self, url: str, payload: dict = None, signed: bool = True) -> Any:
+        """
+        Binance C2C private endpoints expect all parameters (including timestamp
+        and signature) in the query string.  The body is left empty.
+        The signature is computed over the full query-string that includes all
+        payload fields, e.g.:
+          timestamp=1234&page=1&rows=20&orderStatusList=1,2,3
+        """
         async with httpx.AsyncClient(timeout=30) as client:
-            data = payload or {}
-            query_params = {}
+            params = dict(payload or {})
             if signed:
-                ts = int(time.time() * 1000)
-                # For JSON-body POST requests Binance signs only the query string
-                # (i.e. just the timestamp), NOT the JSON body fields.
-                query_string = f"timestamp={ts}"
-                sig = hmac.new(
-                    self.secret_key.encode("utf-8"),
-                    query_string.encode("utf-8"),
+                params["timestamp"] = int(time.time() * 1000)
+                qs = "&".join(f"{k}={v}" for k, v in params.items())
+                params["signature"] = hmac.new(
+                    self.secret_key.encode(),
+                    qs.encode(),
                     hashlib.sha256,
                 ).hexdigest()
-                query_params = {"timestamp": ts, "signature": sig}
-            response = await client.post(
-                url,
-                params=query_params,
-                json=data,
-                headers=self._get_headers(),
-            )
-            response.raise_for_status()
+            headers = {
+                "X-MBX-APIKEY": self.api_key,
+                "Content-Type": "application/json",
+            }
+            response = await client.post(url, params=params, headers=headers)
+            self._raise_for_status(response)
             return response.json()
+
+    @staticmethod
+    def _raise_for_status(response: httpx.Response) -> None:
+        """Raise an error that includes the Binance JSON body for easier debugging."""
+        if response.is_error:
+            try:
+                body = response.json()
+            except Exception:
+                body = response.text
+            logger.error("Binance API error %s %s – body: %s", response.status_code, response.url, body)
+            raise httpx.HTTPStatusError(
+                f"Binance {response.status_code}: {body}",
+                request=response.request,
+                response=response,
+            )
 
     # -------------------------------------------------------------------------
     # Orders
